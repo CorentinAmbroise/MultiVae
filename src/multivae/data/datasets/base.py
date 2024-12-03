@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Dict, Callable
 
 from numpy import ndarray
 from pythae.data.datasets import Dataset, DatasetOutput
@@ -13,11 +13,18 @@ class MultimodalBaseDataset(Dataset):
     Args:
         data (dict) : A dictionary containing the modalities' name and a tensor or numpy array for each modality.
         labels (Union[torch.Tensor, numpy.ndarray]) : A torch.Tensor or numpy.ndarray instance containing the labels.
+        transform (Dict[str, Callable]) : A mapping between each modality and its corresponding function to transform data.
     """
 
-    def __init__(self, data: dict, labels: Union[Tensor, ndarray] = None):
+    def __init__(
+        self,
+        data: Dict[str, Union[Tensor, ndarray]],
+        labels: Union[Tensor, ndarray] = None,
+        transform: Dict[str, Callable] = None,
+    ):
         self.labels = labels
         self.data = data
+        self.transform = transform
 
     def __len__(self):
         length = len(self.data[list(self.data)[0]])
@@ -41,7 +48,9 @@ class MultimodalBaseDataset(Dataset):
         """
         # Select sample
         X = {modality: self.data[modality][index] for modality in self.data}
-
+        if self.transform is not None:
+            transform = self.transform
+            X = {modality: transform[modality](X[modality]) for modality in X}
         if self.labels is not None:
             y = self.labels[index]
             return DatasetOutput(data=X, labels=y)
@@ -68,10 +77,15 @@ class IncompleteDataset(MultimodalBaseDataset):
 
     """
 
-    def __init__(self, data: dict, masks: dict, labels: Tensor = None) -> None:
-        self.data = data
+    def __init__(
+        self,
+        data: Dict[str, Union[Tensor, ndarray]],
+        masks: Dict[str, Union[Tensor, ndarray]],
+        labels: Union[Tensor, ndarray] = None,
+        transform: Dict[str, Callable] = None,
+    ):
+        super().__init__(data, labels, transform)
         self.masks = masks
-        self.labels = labels
         self.check_lenght()
 
     def check_lenght(self):
@@ -108,6 +122,9 @@ class IncompleteDataset(MultimodalBaseDataset):
         """
         # Select sample
         X = {modality: self.data[modality][index] for modality in self.data}
+        if self.transform is not None:
+            transform = self.transform
+            X = {modality: transform[modality](X[modality]) for modality in X}
         m = {modality: self.masks[modality][index] for modality in self.masks}
 
         if self.labels is not None:
